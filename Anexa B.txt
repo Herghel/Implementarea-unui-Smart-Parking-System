@@ -1,0 +1,95 @@
+public class MainActivity extends AppCompatActivity {
+  private static final String HC05_MAC = "00:23:11:A0:44:3B";
+  private static final UUID SPP_UUID =
+      UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+  private BluetoothAdapter bluetoothAdapter;
+  private BluetoothSocket socket;
+  private OutputStream outputStream;
+  private InputStream inputStream;
+  private static final double TARIF_PE_MINUT_REAL = 10.0;
+  private final Map<String,Long> activeParkingSessions = new HashMap<>();
+  private final List<String> historyRecords = new ArrayList<>();
+  private boolean isDangerAlertShown = false;
+
+  private void connectBluetooth() {
+    try {
+      BluetoothDevice dev = bluetoothAdapter.getRemoteDevice(HC05_MAC);
+      socket = dev.createRfcommSocketToServiceRecord(SPP_UUID);
+      socket.connect();
+      outputStream = socket.getOutputStream();
+      inputStream  = socket.getInputStream();
+      startListening();
+    } catch (IOException e) { /* afișare eroare */ }
+  }
+
+  private void startListening() {
+    new Thread(() -> {
+      byte[] buf = new byte[1024];
+      while (socket != null && socket.isConnected()) {
+        try {
+          int n = inputStream.read(buf);
+          String data = new String(buf, 0, n).trim();
+          runOnUiThread(() -> updateUI(data));
+        } catch (IOException e) { break; }
+      }
+    }).start();
+  }
+
+  // Format pachet: "111000,gasValue,waterValue"
+  private void updateUI(String data) {
+    String[] parts = data.split(",");
+    if (parts.length < 3) return;
+    String spots = parts[0];
+    if (spots.length() >= 6) {
+      updateSpot(spot1, car1, spots.charAt(0));
+      // ... idem spot2 - spot6 ...
+      int free = 0;
+      for (char c : spots.toCharArray()) if (c=='1') free++;
+      txtAvailable.setText(free + " / 6");
+    }
+    handleDangerSensors(Integer.parseInt(parts[1]),
+                        Integer.parseInt(parts[2]));
+  }
+
+  // Formula tarif: max(1.0, minute_reale * 10.0) RON
+  private void processPayment(String plate) {
+    Long entryTime = activeParkingSessions.get(plate);
+    if (entryTime == null) {
+      txtStatus.setText("Număr negăsit în sistem!"); return;
+    }
+    long durMs = System.currentTimeMillis() - entryTime;
+    double minutes = durMs / 60000.0;
+    double total = Math.max(1.0, minutes * TARIF_PE_MINUT_REAL);
+    String receipt = String.format(
+      "Număr: %s\nTimp stationat (ore sim): %.2f\nTotal de plată: %.2f RON",
+      plate, minutes, total);
+    new AlertDialog.Builder(this)
+      .setTitle("Chitanță Plată").setMessage(receipt)
+      .setPositiveButton("Achită și Deschide", (d,w) -> {
+        activeParkingSessions.remove(plate);
+        historyRecords.add(0, plate + " | Timp: " + String.format(
+          "%.2f", minutes) + " ore sim | Total: " +
+          String.format("%.2f", total) + " RON");
+        sendCommand("OPEN\n");
+      }).setNegativeButton("Înapoi", null).show();
+  }
+
+  private void sendCommand(String cmd) {
+    try { if(outputStream!=null) outputStream.write(cmd.getBytes()); }
+    catch (IOException e) { e.printStackTrace(); }
+  }
+
+  private void handleDangerSensors(int gas, int water) {
+    if (gas > 750 || water == 1) {
+      if (!isDangerAlertShown) {
+        isDangerAlertShown = true;
+        new AlertDialog.Builder(this)
+          .setTitle("⚠ ALERTĂ DE PERICOL")
+          .setMessage("Senzorii au detectat gaz sau apă!\n" +
+            "Parcarea este în pericol. Vă rugăm să nu intrați\n" +
+            "și să evacuați zona!")
+          .setCancelable(false)
+          .setPositiveButton("Am înțeles",
+            (d,w) -> isDangerAlertShown = false)
+          .show();
+      }
