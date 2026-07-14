@@ -1,0 +1,88 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <Servo.h>
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+Servo barrierServo;
+
+const int parkingPins[6] = {22, 23, 24, 25, 26, 27};
+const int buzzerPin = 8;
+const int waterSensorPin = 10;
+const int gasSensorPin = A0;
+const int servoPin = 9;
+int freePlaces = 0;
+
+void setup() {
+  Serial.begin(9600);
+  Serial1.begin(9600);
+  lcd.init();
+  lcd.backlight();
+  barrierServo.attach(servoPin);
+  barrierServo.write(90);
+  for (int i = 0; i < 6; i++) pinMode(parkingPins[i], INPUT);
+  pinMode(buzzerPin, OUTPUT);
+  pinMode(waterSensorPin, INPUT);
+  digitalWrite(buzzerPin, HIGH);
+  lcd.setCursor(0, 0); lcd.print("SMART PARKING");
+  lcd.setCursor(0, 1); lcd.print("INITIALIZARE...");
+  delay(2000); lcd.clear();
+}
+
+void loop() {
+  checkParkingPlaces();
+  updateLCD();
+  checkBluetooth();
+  checkAlarms();
+  delay(500);
+}
+
+void checkParkingPlaces() {
+  freePlaces = 0;
+  String parkingData = "";
+  for (int i = 0; i < 6; i++) {
+    int val = digitalRead(parkingPins[i]);
+    if (val == HIGH) { freePlaces++; parkingData += "1"; }
+    else { parkingData += "0"; }
+  }
+  int gasValue   = analogRead(gasSensorPin);
+  int waterValue = digitalRead(waterSensorPin);
+  String packet = parkingData + "," + gasValue + "," + waterValue;
+  Serial1.println(packet);
+  Serial.println(packet);
+}
+
+void updateLCD() {
+  lcd.clear();
+  if (freePlaces > 0) {
+    lcd.setCursor(0,0); lcd.print("Locuri libere:");
+    lcd.setCursor(0,1); lcd.print(String(freePlaces) + " din 6");
+  } else {
+    lcd.setCursor(0,0); lcd.print("PARKING FULL");
+    lcd.setCursor(0,1); lcd.print("0 LOCURI LIBERE");
+  }
+}
+
+void checkBluetooth() {
+  if (Serial1.available()) {
+    String command = Serial1.readStringUntil('\n');
+    command.trim();
+    if (command == "OPEN" && freePlaces > 0) {
+      lcd.clear(); lcd.setCursor(0,0); lcd.print("BARIERA OPEN");
+      barrierServo.write(0);
+      delay(3000);
+      barrierServo.write(90);
+      lcd.clear();
+    }
+  }
+}
+
+void checkAlarms() {
+  int gasValue   = analogRead(gasSensorPin);
+  int waterValue = digitalRead(waterSensorPin);
+  if (gasValue > 750 || waterValue == HIGH) {
+    digitalWrite(buzzerPin, LOW); delay(200);
+    digitalWrite(buzzerPin, HIGH); delay(200);
+  } else {
+    digitalWrite(buzzerPin, HIGH);
+  }
+}
