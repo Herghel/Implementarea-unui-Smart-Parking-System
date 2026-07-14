@@ -5,12 +5,12 @@ Lucrarea de față prezintă proiectarea și implementarea unui sistem inteligen
  
 ## Cuprins
  
-- [Descriere generală](#-descriere-generală)
-- [Componente hardware](#-componente-hardware)
-- [Macheta](#-macheta)
-- [Firmware Arduino](#-firmware-arduino)
-- [Aplicația Android](#-aplicația-android)
-- [Interfața grafică](#-interfața-grafică)
+- Descriere generală
+- Componente hardware
+- Macheta
+- Firmware Arduino
+- Aplicația Android
+- Interfața grafică
 
  
 ## Descriere generală
