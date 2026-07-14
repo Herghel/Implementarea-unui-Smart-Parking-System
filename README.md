@@ -48,7 +48,7 @@ Macheta a fost construită pe o suprafață plană, elevată, pentru a permite u
  
 ## Firmware Arduino
  
-Firmware-ul Arduino (prezentat integral în [Anexa A](./firmware/smart_parking.ino))  este organizat conform paradigmei standard Arduino: funcția `setup()`, executată o singură dată la pornire, și funcția `loop()`, care rulează continuu.
+Firmware-ul Arduino (prezentat integral în [Anexa A](./Anexa%20A.txt))  este organizat conform paradigmei standard Arduino: funcția `setup()`, executată o singură dată la pornire, și funcția `loop()`, care rulează continuu.
  
 Diagrama de flux a funcționării firmware-ului Arduino este următoarea:
  
